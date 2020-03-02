@@ -1,0 +1,4 @@
+{
+    "quickMessageParamExample": "new|edit|delete <message_id> <message_text>",
+    "quickMessageDescription": "Send template messages quickly"
+}
