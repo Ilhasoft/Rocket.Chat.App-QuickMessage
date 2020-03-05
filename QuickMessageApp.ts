@@ -22,7 +22,7 @@ export class QuickMessageApp extends App {
     }
 
     protected async extendConfiguration(configuration: IConfigurationExtend, environmentRead: IEnvironmentRead): Promise<void> {
-        return await configuration.slashCommands.provideSlashCommand(new QuickMessageCommand(this))
+        await configuration.slashCommands.provideSlashCommand(new QuickMessageCommand(this))
     }
 
 }

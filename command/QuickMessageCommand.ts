@@ -4,6 +4,7 @@ import { IRead, IModify, IHttp, IPersistence } from "@rocket.chat/apps-engine/de
 import { QuickMessageApp } from "../QuickMessageApp";
 import { CommandError } from "./CommandError";
 import { ICommandArgs } from "./ICommandArgs";
+import { MessageStorageError } from "../storage/MessageStorageError";
 
 export class QuickMessageCommand implements ISlashCommand {
 
@@ -14,10 +15,9 @@ export class QuickMessageCommand implements ISlashCommand {
     private static readonly TXT_USAGE_INFO = '**Instructions**:\n\n' +
         '/quick-message **help**\n' +
         '/quick-message **list**\n' +
-        '/quick-message **send** "id"\n' +
-        '/quick-message **create** "id" "text"\n' +
-        '/quick-message **update** "id" "text"\n' +
-        '/quick-message **remove** "id"';
+        '/quick-message **send** id\n' +
+        '/quick-message **create** id "text"\n' +
+        '/quick-message **remove** id';
 
     public command: string;
     public i18nParamsExample: string;
@@ -49,17 +49,17 @@ export class QuickMessageCommand implements ISlashCommand {
                 case "help":
                     return this.sendNotifyMessage(context, modify, QuickMessageCommand.TXT_USAGE_INFO);
                 case "list":
-                    return this.onListMessages(context, read, modify, persis);
+                    return this.onListMessages(context, read, modify);
                 case "send":
+                    await this.onRunningCommand(context, modify);
                     args = this.getOperationArgs(context.getArguments());
-                    return await this.onSendMessage(context, read, modify, persis, args.id);
+                    return await this.onSendMessage(context, read, modify, args.id);
                 case "create":
+                    await this.onRunningCommand(context, modify);
                     args = this.getOperationArgs(context.getArguments(), true);
                     return await this.onCreateMessage(context, read, modify, persis, args.id, args.text!);
-                case "update":
-                    args = this.getOperationArgs(context.getArguments(), true);
-                    return await this.onUpdateMessage(context, read, modify, persis, args.id, args.text!);
                 case "remove":
+                    await this.onRunningCommand(context, modify);
                     args = this.getOperationArgs(context.getArguments());
                     return await this.onRemoveMessage(context, read, modify, persis, args.id);
                 default:
@@ -68,14 +68,15 @@ export class QuickMessageCommand implements ISlashCommand {
         } catch (error) {
             if (error instanceof CommandError) {
                 return await this.onInvalidUsage(context, modify);
-            } else {
-                this.app.getLogger().error(error);
-                return await this.sendNotifyMessage(
-                    context,
-                    modify,
-                    `An error occurred when trying perform **${operation}** operation :disappointed_relieved:`
-                );
             }
+            console.log(error);
+            this.app.getLogger().error(error);
+            let errorMessage = ":x: An error occurred";
+
+            if (error instanceof MessageStorageError) {
+                errorMessage = errorMessage.concat(`: ${error.message}`);
+            }
+            return await this.sendNotifyMessage(context, modify, errorMessage);
         }
     }
 
@@ -95,12 +96,12 @@ export class QuickMessageCommand implements ISlashCommand {
             throw new CommandError(QuickMessageCommand.ERR_INVALID_COMMAND);
         }
         let textArg = args.slice(1, args.length).join(' ');
-        textArg = textArg.substring(1, textArg.length);
+        textArg = textArg.substring(1, textArg.length - 1);
 
         return { id: args[0], text: textArg };
     }
 
-    private async sendNotifyMessage(context: SlashCommandContext, modify: IModify, text: string): Promise<void> {
+    private async sendNotifyMessage(context: SlashCommandContext, modify: IModify, text: string) {
         const message = modify.getCreator().startMessage()
             .setUsernameAlias("Quick Message")
             .setEmojiAvatar(":speech_balloon:")
@@ -112,27 +113,46 @@ export class QuickMessageCommand implements ISlashCommand {
         await modify.getNotifier().notifyUser(context.getSender(), message);
     }
 
-    private async onInvalidUsage(context: SlashCommandContext, modify: IModify): Promise<void> {
+    private async sendMessage(context: SlashCommandContext, modify: IModify, text: string) {
+        const messageBuilder = modify.getCreator().startMessage()
+            .setRoom(context.getRoom())
+            .setSender(context.getSender())
+            .setText(text);
+
+        await modify.getCreator().finish(messageBuilder);
+    }
+
+    private async onRunningCommand(context: SlashCommandContext, modify: IModify) {
+        await this.sendNotifyMessage(context, modify, `_Running..._\n\`\`\`bash\n/quick-message ${context.getArguments().join(' ')}\`\`\``);
+    }
+
+    private async onInvalidUsage(context: SlashCommandContext, modify: IModify) {
         await this.sendNotifyMessage(context, modify, QuickMessageCommand.TXT_INVALID_COMMAND);
     }
 
-    private async onListMessages(
-        context: SlashCommandContext,
-        read: IRead,
-        modify: IModify,
-        persis: IPersistence
-    ): Promise<void> {
-           
+    private async onListMessages(context: SlashCommandContext, read: IRead, modify: IModify) {
+        const messages = await this.app.getStorageManager().readAll(read);
+
+        if (messages.length == 0) {
+            return await this.sendNotifyMessage(context, modify, "No messages created yet. :person_shrugging:");
+        }
+        let text = ":notepad_spiral: Created Messages";
+
+        messages.forEach(message => {
+            text = text.concat(`\n:small_blue_diamond: **${message.id}** - "${message.text}"`)
+                .concat(`, created by **${message.createdBy.username}** at _${message.createdAt.toLocaleString()}_`);
+        });
+        await this.sendNotifyMessage(context, modify, text);
     }
 
     private async onSendMessage(
         context: SlashCommandContext,
         read: IRead,
         modify: IModify,
-        persis: IPersistence,
         messageId: string
-    ): Promise<void> {
-        
+    ) {
+        const message = await this.app.getStorageManager().read(read, messageId);
+        await this.sendMessage(context, modify, message.text);
     }
 
     private async onCreateMessage(
@@ -142,19 +162,9 @@ export class QuickMessageCommand implements ISlashCommand {
         persis: IPersistence,
         messageId: string,
         messageText: string
-    ): Promise<void> {
-        
-    }
-
-    private async onUpdateMessage(
-        context: SlashCommandContext,
-        read: IRead,
-        modify: IModify,
-        persis: IPersistence,
-        messageId: string,
-        messageText: string
-    ): Promise<void> {
-        
+    ) {
+        await this.app.getStorageManager().create(context, read, persis, messageId, messageText);
+        await this.sendNotifyMessage(context, modify, `:white_check_mark: Message with id "${messageId}" created.`);
     }
 
     private async onRemoveMessage(
@@ -163,8 +173,9 @@ export class QuickMessageCommand implements ISlashCommand {
         modify: IModify,
         persis: IPersistence,
         messageId: string
-    ): Promise<void> {
-        
+    ) {
+        await this.app.getStorageManager().remove(read, persis, messageId);
+        await this.sendNotifyMessage(context, modify, `:white_check_mark: Message with id "${messageId}" removed.`);
     }
 
 }

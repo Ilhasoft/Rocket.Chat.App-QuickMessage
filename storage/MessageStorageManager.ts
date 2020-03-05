@@ -41,7 +41,7 @@ export class MessageStorageManager {
         }
         let data = await this.getMessageData(read, messageId);
 
-        if (data == null) {
+        if (data != null) {
             throw new MessageStorageError(MessageStorageManager.ERR_MESSAGE_ALREADY_EXISTS);
         }
         const now = new Date();
@@ -61,6 +61,10 @@ export class MessageStorageManager {
         await persis.createWithAssociation(data, messageAssoc);
     }
 
+    /**
+     * Don't use this method yet because it is not implemented in the Rocket Chat persistence source:
+     * https://github.com/RocketChat/Rocket.Chat/blob/e9890aaaff1ddfb99f1687ad8be55b8864db180b/app/apps/server/bridges/persistence.js#L93
+    */
     public async update(
         context: SlashCommandContext,
         read: IRead,
