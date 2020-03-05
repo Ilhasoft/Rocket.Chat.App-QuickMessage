@@ -2,19 +2,22 @@ import { ISlashCommand, ISlashCommandPreview, ISlashCommandPreviewItem, SlashCom
 import { SlashCommandContext } from "@rocket.chat/apps-engine/definition/slashcommands";
 import { IRead, IModify, IHttp, IPersistence } from "@rocket.chat/apps-engine/definition/accessors";
 import { QuickMessageApp } from "../QuickMessageApp";
-import { InvalidCommandError } from "./InvalidCommandError";
-import { IOperationArgs } from "./IOperationArgs";
+import { CommandError } from "./CommandError";
+import { ICommandArgs } from "./ICommandArgs";
 
 export class QuickMessageCommand implements ISlashCommand {
 
-    private static readonly ERROR_INVALIDargs_FMT = "Invalid args format.";
-    private static readonly TEXT_INVALID_COMMAND = 'Invalid command format! Type `/quick-message info` to see instructions.\n';
-    private static readonly TEXT_USAGE_INFO = '**Instructions**:\n\n' +
+    // Own error messages
+    private static readonly ERR_INVALID_COMMAND = "Invalid command format.";
+    // Own texts to send as notify messages
+    private static readonly TXT_INVALID_COMMAND = 'Invalid command format! Type `/quick-message info` to see instructions.\n';
+    private static readonly TXT_USAGE_INFO = '**Instructions**:\n\n' +
+        '/quick-message **help**\n' +
         '/quick-message **list**\n' +
         '/quick-message **send** "id"\n' +
-        '/quick-message **new** "id" "text"\n' +
-        '/quick-message **edit** "id" "text"\n' +
-        '/quick-message **delete** "id"';
+        '/quick-message **create** "id" "text"\n' +
+        '/quick-message **update** "id" "text"\n' +
+        '/quick-message **remove** "id"';
 
     public command: string;
     public i18nParamsExample: string;
@@ -36,38 +39,37 @@ export class QuickMessageCommand implements ISlashCommand {
         persis: IPersistence
     ): Promise<void> {
         if (context.getArguments().length == 0) {
-            return await this.handleInvalidUsage(context, modify);
+            return await this.onInvalidUsage(context, modify);
         }
         const operation = context.getArguments()[0];
-        let args: IOperationArgs;
+        let args: ICommandArgs;
 
         try {
             switch (operation) {
-                case "info":
-                    return this.sendNotifyMessage(context, modify, QuickMessageCommand.TEXT_USAGE_INFO);
+                case "help":
+                    return this.sendNotifyMessage(context, modify, QuickMessageCommand.TXT_USAGE_INFO);
                 case "list":
-                    return this.handleMessageList(context, read, modify, persis);
+                    return this.onListMessages(context, read, modify, persis);
                 case "send":
                     args = this.getOperationArgs(context.getArguments());
-                    return await this.handleMessageSending(context, read, modify, persis, args.id);
-                case "new":
+                    return await this.onSendMessage(context, read, modify, persis, args.id);
+                case "create":
                     args = this.getOperationArgs(context.getArguments(), true);
-                    return await this.handleMessageNew(context, read, modify, persis, args.id, args.text!);
-                case "edit":
+                    return await this.onCreateMessage(context, read, modify, persis, args.id, args.text!);
+                case "update":
                     args = this.getOperationArgs(context.getArguments(), true);
-                    return await this.handleMessageEdit(context, read, modify, persis, args.id, args.text!);
-                case "delete":
+                    return await this.onUpdateMessage(context, read, modify, persis, args.id, args.text!);
+                case "remove":
                     args = this.getOperationArgs(context.getArguments());
-                    return await this.handleMessageDelete(context, read, modify, persis, args.id);
+                    return await this.onRemoveMessage(context, read, modify, persis, args.id);
                 default:
-                    return await this.handleInvalidUsage(context, modify);
+                    return await this.onInvalidUsage(context, modify);
             }
         } catch (error) {
-            if (error instanceof InvalidCommandError) {
-                return await this.handleInvalidUsage(context, modify);
+            if (error instanceof CommandError) {
+                return await this.onInvalidUsage(context, modify);
             } else {
                 this.app.getLogger().error(error);
-                console.log("Error:", error);
                 return await this.sendNotifyMessage(
                     context,
                     modify,
@@ -77,9 +79,9 @@ export class QuickMessageCommand implements ISlashCommand {
         }
     }
 
-    private getOperationArgs(args: Array<string>, requireTextArg: boolean = false): IOperationArgs {
+    private getOperationArgs(args: Array<string>, requireTextArg: boolean = false): ICommandArgs {
         if (args.length < 2) {
-            throw new InvalidCommandError(QuickMessageCommand.ERROR_INVALIDargs_FMT);
+            throw new CommandError(QuickMessageCommand.ERR_INVALID_COMMAND);
         }
         args = args.slice(1, args.length);
 
@@ -90,7 +92,7 @@ export class QuickMessageCommand implements ISlashCommand {
         const endTextArg = args[args.length - 1];
 
         if (beginTextArg[0] != '"' || endTextArg[endTextArg.length - 1] != '"') {
-            throw new InvalidCommandError(QuickMessageCommand.ERROR_INVALIDargs_FMT);
+            throw new CommandError(QuickMessageCommand.ERR_INVALID_COMMAND);
         }
         let textArg = args.slice(1, args.length).join(' ');
         textArg = textArg.substring(1, textArg.length);
@@ -107,33 +109,33 @@ export class QuickMessageCommand implements ISlashCommand {
             .setSender(context.getSender())
             .getMessage();
 
-        return await modify.getNotifier().notifyUser(context.getSender(), message);
+        await modify.getNotifier().notifyUser(context.getSender(), message);
     }
 
-    private async handleInvalidUsage(context: SlashCommandContext, modify: IModify): Promise<void> {
-        return await this.sendNotifyMessage(context, modify, QuickMessageCommand.TEXT_INVALID_COMMAND);
+    private async onInvalidUsage(context: SlashCommandContext, modify: IModify): Promise<void> {
+        await this.sendNotifyMessage(context, modify, QuickMessageCommand.TXT_INVALID_COMMAND);
     }
 
-    private async handleMessageList(
+    private async onListMessages(
         context: SlashCommandContext,
         read: IRead,
         modify: IModify,
         persis: IPersistence
     ): Promise<void> {
-        return await this.sendNotifyMessage(context, modify, "onHandleMessagesList");
+           
     }
 
-    private async handleMessageSending(
+    private async onSendMessage(
         context: SlashCommandContext,
         read: IRead,
         modify: IModify,
         persis: IPersistence,
         messageId: string
     ): Promise<void> {
-        return await this.sendNotifyMessage(context, modify, "onHandleMessageSending");
+        
     }
 
-    private async handleMessageNew(
+    private async onCreateMessage(
         context: SlashCommandContext,
         read: IRead,
         modify: IModify,
@@ -141,10 +143,10 @@ export class QuickMessageCommand implements ISlashCommand {
         messageId: string,
         messageText: string
     ): Promise<void> {
-        return await this.sendNotifyMessage(context, modify, "onHandleMessageNew");
+        
     }
 
-    private async handleMessageEdit(
+    private async onUpdateMessage(
         context: SlashCommandContext,
         read: IRead,
         modify: IModify,
@@ -152,17 +154,17 @@ export class QuickMessageCommand implements ISlashCommand {
         messageId: string,
         messageText: string
     ): Promise<void> {
-        return await this.sendNotifyMessage(context, modify, "onHandleMessageEdit");
+        
     }
 
-    private async handleMessageDelete(
+    private async onRemoveMessage(
         context: SlashCommandContext,
         read: IRead,
         modify: IModify,
         persis: IPersistence,
         messageId: string
     ): Promise<void> {
-        return await this.sendNotifyMessage(context, modify, "onHandleMessageDelete");
+        
     }
 
 }

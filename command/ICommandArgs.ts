@@ -1,4 +1,4 @@
-export interface IOperationArgs {
+export interface ICommandArgs {
     id: string;
     text?: string;
 }
