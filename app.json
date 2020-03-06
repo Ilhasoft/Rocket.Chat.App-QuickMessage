@@ -11,5 +11,5 @@
     "name": "Quick Message",
     "nameSlug": "quick-message",
     "classFile": "QuickMessageApp.ts",
-    "description": "Send template messages quickly"
+    "description": "Send repetitive messages quickly"
 }
