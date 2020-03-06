@@ -11,13 +11,15 @@ export class QuickMessageCommand implements ISlashCommand {
     // Own error messages
     private static readonly ERR_INVALID_COMMAND = "Invalid command format.";
     // Own texts to send as notify messages
-    private static readonly TXT_INVALID_COMMAND = 'Invalid command format! Type `/quick-message info` to see instructions.\n';
-    private static readonly TXT_USAGE_INFO = '**Instructions**:\n\n' +
-        '/quick-message **help**\n' +
-        '/quick-message **list**\n' +
-        '/quick-message **send** id\n' +
-        '/quick-message **create** id "text"\n' +
-        '/quick-message **remove** id';
+    private static readonly TXT_INVALID_COMMAND = ':x: Invalid command format! Type `/quick-message help` to see instructions.';
+    private static readonly TXT_USAGE_INFO = 'QuickMessage is an app to handle with repetitive messages, ' +
+        'so we provide a way to storage template messages related with a specific id globally. Available operations:\n\n' +
+        'To see this help:         `/quick-message help`\n' +
+        'To list created messages: `/quick-message list`\n' +
+        'To send a message:        `/quick-message send id`          (e.g. /quick-message send good-morning)\n' +
+        'To create a message:      `/quick-message create id "text"` (e.g. /quick-message create good-morning "Good morning yall!!")\n' +
+        'To remove a message:      `/quick-message remove id`        (e.g. /quick-message remove good-morning)\n\n' +
+        '- Available characters to message id: **A-Z**, **a-z**, **0-9** or **"-"**.';
 
     public command: string;
     public i18nParamsExample: string;
@@ -69,13 +71,14 @@ export class QuickMessageCommand implements ISlashCommand {
             if (error instanceof CommandError) {
                 return await this.onInvalidUsage(context, modify);
             }
-            console.log(error);
             this.app.getLogger().error(error);
             let errorMessage = ":x: An error occurred";
 
-            if (error instanceof MessageStorageError) {
+            try {
+                error = error as MessageStorageError;
                 errorMessage = errorMessage.concat(`: ${error.message}`);
-            }
+            } catch (castingError) { }
+
             return await this.sendNotifyMessage(context, modify, errorMessage);
         }
     }
@@ -86,8 +89,10 @@ export class QuickMessageCommand implements ISlashCommand {
         }
         args = args.slice(1, args.length);
 
-        if (args.length == 1 && !requireTextArg) {
+        if (!requireTextArg && args.length == 1) {
             return { id: args[0] };
+        } else if (!requireTextArg) {
+            throw new CommandError(QuickMessageCommand.ERR_INVALID_COMMAND);
         }
         const beginTextArg = args[1];
         const endTextArg = args[args.length - 1];
@@ -103,7 +108,7 @@ export class QuickMessageCommand implements ISlashCommand {
 
     private async sendNotifyMessage(context: SlashCommandContext, modify: IModify, text: string) {
         const message = modify.getCreator().startMessage()
-            .setUsernameAlias("Quick Message")
+            .setUsernameAlias("QuickMessage")
             .setEmojiAvatar(":speech_balloon:")
             .setText(text)
             .setRoom(context.getRoom())
@@ -123,7 +128,7 @@ export class QuickMessageCommand implements ISlashCommand {
     }
 
     private async onRunningCommand(context: SlashCommandContext, modify: IModify) {
-        await this.sendNotifyMessage(context, modify, `_Running..._\n\`\`\`bash\n/quick-message ${context.getArguments().join(' ')}\`\`\``);
+        await this.sendNotifyMessage(context, modify, `:desktop: /quick-message ${context.getArguments().join(' ')}`);
     }
 
     private async onInvalidUsage(context: SlashCommandContext, modify: IModify) {
@@ -134,7 +139,7 @@ export class QuickMessageCommand implements ISlashCommand {
         const messages = await this.app.getStorageManager().readAll(read);
 
         if (messages.length == 0) {
-            return await this.sendNotifyMessage(context, modify, "No messages created yet. :person_shrugging:");
+            return await this.sendNotifyMessage(context, modify, "No messages. :person_shrugging:");
         }
         let text = ":notepad_spiral: Created Messages";
 
@@ -164,7 +169,7 @@ export class QuickMessageCommand implements ISlashCommand {
         messageText: string
     ) {
         await this.app.getStorageManager().create(context, read, persis, messageId, messageText);
-        await this.sendNotifyMessage(context, modify, `:white_check_mark: Message with id "${messageId}" created.`);
+        await this.sendNotifyMessage(context, modify, `:white_check_mark: Message with the id "${messageId}" **created**.`);
     }
 
     private async onRemoveMessage(
@@ -175,7 +180,7 @@ export class QuickMessageCommand implements ISlashCommand {
         messageId: string
     ) {
         await this.app.getStorageManager().remove(read, persis, messageId);
-        await this.sendNotifyMessage(context, modify, `:white_check_mark: Message with id "${messageId}" removed.`);
+        await this.sendNotifyMessage(context, modify, `:white_check_mark: Message with the id "${messageId}" **removed**.`);
     }
 
 }

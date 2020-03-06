@@ -13,6 +13,8 @@ export class MessageStorageManager {
     // Association ID to retrieve all storaged messages
     private static readonly ASSOC_ID_GLOBAL = "message_storage_manager";
 
+    private static readonly REGEX_MESSAGE_ID = /^[A-Z|a-z|0-9|\-]*$/;
+
     public async read(read: IRead, messageId: string): Promise<IMessageData> {
         const data = await this.getMessageData(read, messageId);
 
@@ -36,7 +38,7 @@ export class MessageStorageManager {
         messageId: string,
         messageText: string
     ): Promise<void> {
-        if (messageId == MessageStorageManager.ASSOC_ID_GLOBAL) {
+        if (messageId == MessageStorageManager.ASSOC_ID_GLOBAL || !MessageStorageManager.REGEX_MESSAGE_ID.test(messageId)) {
             throw new MessageStorageError(MessageStorageManager.ERR_INVALID_MESSAGE_ID);
         }
         let data = await this.getMessageData(read, messageId);

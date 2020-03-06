@@ -1,6 +1,6 @@
 export class CommandError extends Error {
 
-    public name = "QuickMessageCommandError";
+    public name = "QuickMessage_CommandError";
 
     constructor(message: string) {
         super(message);
