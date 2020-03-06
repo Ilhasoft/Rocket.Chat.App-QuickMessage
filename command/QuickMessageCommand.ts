@@ -12,14 +12,14 @@ export class QuickMessageCommand implements ISlashCommand {
     private static readonly ERR_INVALID_COMMAND = "Invalid command format.";
     // Own texts to send as notify messages
     private static readonly TXT_INVALID_COMMAND = ':x: Invalid command format! Type `/quick-message help` to see instructions.';
-    private static readonly TXT_USAGE_INFO = 'QuickMessage is an app to handle with repetitive messages, ' +
-        'so we provide a way to storage template messages related with a specific id globally. Available operations:\n\n' +
+    private static readonly TXT_USAGE_INFO = 'QuickMessage is a Rocket.Chat app for handling repetitive messages, providing a way to ' +
+        'store template messages related to a specific id for all users. Available operations:\n\n' +
         'To see this help:         `/quick-message help`\n' +
         'To list created messages: `/quick-message list`\n' +
         'To send a message:        `/quick-message send id`          (e.g. /quick-message send good-morning)\n' +
         'To create a message:      `/quick-message create id "text"` (e.g. /quick-message create good-morning "Good morning yall!!")\n' +
         'To remove a message:      `/quick-message remove id`        (e.g. /quick-message remove good-morning)\n\n' +
-        '- Available characters to message id: **A-Z**, **a-z**, **0-9** or **"-"**.';
+        'IMPORTANT: available characters for message id are in **A-Z**, **a-z**, **0-9** or **"-"**.';
 
     public command: string;
     public i18nParamsExample: string;
