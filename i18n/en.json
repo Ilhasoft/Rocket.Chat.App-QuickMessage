@@ -1,0 +1,4 @@
+{
+    "quickMessageParamExample": "help|list|send|create|remove",
+    "quickMessageDescription": "Send template messages quickly"
+}

@@ -1,0 +1,15 @@
+{
+    "id": "c02172fb-d3fe-46db-976a-9016c4866695",
+    "version": "0.0.1",
+    "requiredApiVersion": "^1.4.0",
+    "iconFile": "icon.png",
+    "author": {
+        "name": "Ilhasoft",
+        "homepage": "https://github.com/push-platform/Rocket.Chat.App-QuickMessage",
+        "support": "https://github.com/push-platform/Rocket.Chat.App-QuickMessage/issues"
+    },
+    "name": "Quick Message",
+    "nameSlug": "quick-message",
+    "classFile": "QuickMessageApp.ts",
+    "description": "Send repetitive messages quickly"
+}
